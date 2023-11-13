@@ -1,0 +1,95 @@
+{
+  "name": "AmpliconSuite-DNANexus-applet",
+  "title": "AmpliconSuite",
+  "summary": "Applet to run PrepareAA, AmpliconArchitect, and AmpliconClassifier",
+  "dxapi": "1.0.0",
+  "version": "0.0.1",
+  "inputSpec": [
+    {
+      "name": "bam",
+      "label": "tumor WGS",
+      "class": "file",
+      "optional": false,
+      "patterns": [
+        "*.bam"
+      ],
+      "help": "Indexed bam file containing tumor WGS."
+    },
+    {
+      "name": "index",
+      "label": "tumor WGS index",
+      "class": "file",
+      "optional": false,
+      "patterns": [
+        "*.bai"
+      ],
+      "help": "Index for bam file."
+    },
+    {
+      "name": "ref",
+      "label": "reference genome",
+      "class": "string",
+      "optional": false,
+      "help": "hg19, hg38, GRCh37, or GRCh38"
+    },
+    {
+      "name": "data_repo",
+      "label": "AA data repo",
+      "class": "file",
+      "optional": false,
+      "patterns": [
+        "*.tar.gz"
+      ],
+      "help": "The data_repo directory for AA. Must be writable."
+    },
+    {
+      "name": "mosek_lic",
+      "label": "mosek license .lic",
+      "class": "file",
+      "optional": false,
+      "patterns": [
+        "*.lic"
+      ],
+      "help": "A mosek licence is required. A free license for academic use can be obtained at https://www.mosek.com/products/academic-licenses/"
+    }
+  ],
+  "outputSpec": [],
+  "runSpec": {
+    "timeoutPolicy": {
+      "*": {
+        "days": 2
+      }
+    },
+    "interpreter": "bash",
+    "file": "src/AmpliconSuite-DNANexus-applet.sh",
+    "distribution": "Ubuntu",
+    "release": "20.04",
+    "version": "0",
+    "execDepends": [
+      {
+        "name": "python"
+      },
+      {
+        "name": "AmpliconSuite-pipeline",
+        "package_manager": "git",
+        "url": "https://github.com/AmpliconSuite/AmpliconSuite-pipeline",
+        "destdir": "resources"
+      }
+    ]
+  },
+  "access": {
+    "network": [
+      "*"
+    ],
+    "project": "CONTRIBUTE"
+  },
+  "regionalOptions": {
+    "azure:westus": {
+      "systemRequirements": {
+        "*": {
+          "instanceType": "azure:mem2_ssd1_x8"
+        }
+      }
+    }
+  }
+}
