@@ -8,7 +8,14 @@ For more information about how to run or modify it, see
 https://documentation.dnanexus.com/.
 <!-- /dx-header -->
 
-Get the docker image into your project using:
+## Requirements:
+- DNANexus account
+- `dxpy`
+
+## 1st time startup
+- `dx login`
+- `dx ssh_config`
+- Add the docker image into your project:
 ```
 dx run cloud_workstation -imax_session_length=10h --ssh --brief -y
 docker pull jluebeck/prepareaa:latest
