@@ -59,7 +59,7 @@ main() {
     ## Parse and run command
     # Locations of executables are defined in dxapp.json.
 
-    cmd="python3 ${AA_SRC}/docker/run_paa_docker.py --sample_name ${bam_prefix} --nthreads 8 --bam ${bam_path} --ref $ref --run_AA --output_directory $HOME/out"
+    cmd="python3 ${AA_SRC}/docker/run_paa_docker.py --sample_name ${bam_prefix} --nthreads 8 --bam ${bam_path} --ref $ref --cngain $cngain --run_AA --output_directory $HOME/out"
     eval $cmd
 
     ## Export outputs
