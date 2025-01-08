@@ -1,7 +1,7 @@
 <!-- dx-header -->
 # AmpliconSuite (DNAnexus Platform App)
 
-Applet to run PrepareAA, AmpliconArchitect, and AmpliconClassifier
+Applet to run PrepareAA, AmpliconArchitect, and AmpliconClassifier on the DNANexus platform.
 
 This is the source code for an app that runs on the DNAnexus Platform.
 For more information about how to run or modify it, see
