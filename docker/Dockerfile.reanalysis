@@ -1,0 +1,45 @@
+# aa_version=reanalysis: latest AmpliconSuite as of Aug 2024, for the flagged samples.
+#   Base: jluebeck/prepareaa:v1.3.3 (pushed 2024-06-19), pinned by digest. It bundles AmpliconSuite-pipeline 1.3.3,
+#   AmpliconArchitect 1.4.r2 and AmpliconClassifier 1.2.0 (Python 3, Mosek 10); the build fails if they differ.
+#   Added: CNVkit 0.9.6 env and the PrepareAA @ 8284de8 reference files, so CNV seeds are computed exactly
+#   as in the original configuration and only AA/AC differ between the two.
+# Build from the docker/ directory: see build_images.sh.
+FROM mambaorg/micromamba:1.5.8@sha256:475730daef12ff9c0733e70092aeeefdf4c373a584c952dac3f7bdb739601990 AS micromamba
+
+FROM jluebeck/prepareaa@sha256:568dac7889a76b8320af89f711a1c64466df8d95243dcb560702f59a2b2bcee5
+
+ARG PAA_COMMIT=8284de83e794b159094bfebcad7fc7e1a311f508
+USER root
+
+ENV AA_SRC=/home/programs/AmpliconArchitect-master/src \
+    AC_SRC=/home/programs/AmpliconClassifier-main \
+    PAA_SRC=/home/programs/AmpliconSuite-pipeline-master \
+    PAA_REFS=/opt/PrepareAA \
+    CNVKIT_BIN=/opt/conda/envs/cnvkit/bin \
+    AA_PYTHON=python3 \
+    AC_PYTHON=python3
+
+RUN grep -qx '__version__ = "1.4.r2"' $AA_SRC/AmpliconArchitect.py \
+ && grep -qx '__version__ = "1.2.0"' $AC_SRC/amplicon_classifier.py \
+ && grep -q '"1.3.3"' $PAA_SRC/paalib/_version.py
+
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/* \
+ && git clone https://github.com/AmpliconSuite/AmpliconSuite-pipeline.git $PAA_REFS \
+ && git -C $PAA_REFS checkout --detach ${PAA_COMMIT}
+
+COPY --from=micromamba /bin/micromamba /usr/local/bin/micromamba
+COPY envs/cnvkit-0.9.6.yml /tmp/envs/
+ENV MAMBA_ROOT_PREFIX=/opt/conda
+RUN mkdir -p /opt/applet \
+ && micromamba create -y -n cnvkit -f /tmp/envs/cnvkit-0.9.6.yml \
+ && micromamba env export -n cnvkit --explicit > /opt/applet/cnvkit.lock \
+ && micromamba clean -a -y && rm -rf /tmp/envs \
+ && /opt/conda/envs/cnvkit/bin/cnvkit.py version | grep -qx '0.9.6'
+
+COPY tool_versions.sh /opt/applet/tool_versions.sh
+RUN { echo "configuration: reanalysis"; \
+      echo "Base image: jluebeck/prepareaa:v1.3.3@sha256:568dac7889a76b8320af89f711a1c64466df8d95243dcb560702f59a2b2bcee5"; \
+      echo "PrepareAA reference files: ${PAA_REFS}/<ref> @ $(git -C $PAA_REFS rev-parse --short HEAD)"; \
+    } > /opt/applet/BUILD_INFO
+
+USER aa_user

@@ -12,16 +12,62 @@ https://documentation.dnanexus.com/.
 - DNANexus account
 - `dxpy`
 
+## Pinned versions
+The `aa_version` input selects one of two Docker images, built from `docker/`:
+
+| | `original` (default; manuscript) | `reanalysis` (flagged samples only) |
+|---|---|---|
+| PrepareAA / AmpliconSuite-pipeline | PrepareAA `8284de8` (2020-04-23) | AmpliconSuite-pipeline 1.3.3 |
+| AmpliconArchitect (AA) | 1.2, commit `d9aac51` (Python 2.7, Mosek 8.0.0.60) | 1.4.r2 (Python 3, Mosek 10.0.38) |
+| AmpliconClassifier (AC) | v1.1.2 (Python 3, separate env) | 1.2.0 |
+| CNVkit (seeding) | 0.9.6 | 0.9.6 |
+| Seed CN threshold | `--cngain 4.5` | `--cngain 4.5` |
+
+- AA has no `v1.2` tag upstream; `d9aac51` is the last commit whose `__version__` is `"1.2"`.
+- `reanalysis` is `jluebeck/prepareaa:v1.3.3` pinned by digest (`sha256:568dac78…`); the build checks that it contains AA 1.4.r2, AC 1.2.0 and pipeline 1.3.3.
+- Every job writes a `tool_versions` output (also inside the results tarball) with the tool versions, commits, image ID, CNV seeding path and run parameters.
+
 ## 1st time startup
 - `dx login`
-- `dx ssh_config`
-- Add the docker image into your project:
+- `dx select <project>`
+- Build the images and upload them to `/ampliconsuite_images/` in the project (needs docker; the jobs load them from there):
 ```
-dx run cloud_workstation -imax_session_length=10h --ssh --brief -y
-docker pull jluebeck/prepareaa:latest
-docker save jluebeck/prepareaa | gzip > ampliconsuite_snapshot.tar.gz
-dx upload ampliconsuite_snapshot.tar.gz
+docker/build_images.sh               # both images
+docker/build_images.sh original      # or just one
 ```
+- Build the applet: `dx build`
+
+## Usage
+Tumor-only (as before):
+```
+dx run ampliconsuite-dnanexus-applet -ibam=tumor.bam -iindex=tumor.bam.bai -iref=GRCh38 \
+    -idata_repo=GRCh38.tar.gz -imosek_lic=mosek.lic
+```
+Paired tumor/matched normal: add the normal BAM and its index.
+```
+dx run ampliconsuite-dnanexus-applet -ibam=tumor.bam -iindex=tumor.bam.bai \
+    -inormal_bam=normal.bam -inormal_index=normal.bam.bai -iref=GRCh38 \
+    -idata_repo=GRCh38.tar.gz -imosek_lic=mosek.lic
+```
+Reanalysis configuration: add `-iaa_version=reanalysis`.
+
+`ref` must be `hg19`, `GRCh37` or `GRCh38`.
+
+### How CNV seeds are made
+PrepareAA `8284de8` has no `--normal_bam` option, and its Docker runner only accepts a precomputed `--cnv_bed`. The applet therefore always runs CNVkit 0.9.6 itself and passes the result as `--cnv_bed`:
+- Tumor-only: `cnvkit.py batch -m wgs -y -r <ref>_cnvkit_filtered_ref.cnn` then `cnvkit.py segment`, the same commands as PrepareAA `8284de8`.
+- Paired: `cnvkit.py batch <tumor.bam> --normal <normal.bam> -m wgs --fasta <data repo FASTA, noAlt contigs>` then `cnvkit.py segment`.
+- `original`: segments are converted as PrepareAA `8284de8` does (CN = 2^(log2+1); keep CN >= 4.5 and >= 50 kb; bed columns `chr start end CNVkit CN`), then PrepareAA runs AA's `amplified_intervals.py` with `--gain 4.5`.
+- `reanalysis`: the unfiltered `.cns` is passed to AmpliconSuite-pipeline 1.3.3, which applies its own seed pre-filter and `--cngain 4.5`.
+
+The flat CNVkit references and `noAlt` contig lists come from the PrepareAA `8284de8` checkout in the image. For `original`, PrepareAA's reference files are also copied into the data repo where missing, as PrepareAA requires.
+
+### Mosek license
+The `original` image uses Mosek 8 and `reanalysis` uses Mosek 10. Check that your license file covers the version you run.
+
+## Outputs
+- `results`: `<sample>_outputs.tar.gz` with CNVkit output, PrepareAA/AA results and AC classification.
+- `tool_versions`: `<sample>_tool_versions.txt`.
 
 ## Contributors:
 Owen Chapman, Shanqing Wang.

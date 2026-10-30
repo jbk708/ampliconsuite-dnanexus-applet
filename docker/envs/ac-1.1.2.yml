@@ -1,0 +1,12 @@
+# Python 3 runtime for AmpliconClassifier v1.1.2 (released 2024-02-04); versions current at that release.
+# Kept separate from the Python 2.7 AmpliconArchitect 1.2 runtime.
+name: ac
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - intervaltree=3.1.0
+  - numpy=1.26.4
+  - scipy=1.11.4
+  - pandas=2.1.4
+  - matplotlib-base=3.8.2

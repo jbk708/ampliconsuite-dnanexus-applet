@@ -3,7 +3,7 @@
   "title": "AmpliconSuite",
   "summary": "Applet to run PrepareAA, AmpliconArchitect, and AmpliconClassifier",
   "dxapi": "1.0.0",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "inputSpec": [
     {
       "name": "bam",
@@ -24,6 +24,26 @@
         "*.bai"
       ],
       "help": "Index for bam file."
+    },
+    {
+      "name": "normal_bam",
+      "label": "matched normal WGS",
+      "class": "file",
+      "optional": true,
+      "patterns": [
+        "*.bam"
+      ],
+      "help": "Optional indexed bam file containing matched-normal WGS. If given, CNVkit 0.9.6 builds its reference from this sample (paired mode); otherwise tumor-only."
+    },
+    {
+      "name": "normal_index",
+      "label": "matched normal WGS index",
+      "class": "file",
+      "optional": true,
+      "patterns": [
+        "*.bai"
+      ],
+      "help": "Index for the matched-normal bam file. Required if normal_bam is given."
     },
     {
       "name": "ref",
@@ -59,6 +79,38 @@
         "*.lic"
       ],
       "help": "A mosek licence is required. A free license for academic use can be obtained at https://www.mosek.com/products/academic-licenses/"
+    },
+    {
+      "name": "aa_version",
+      "label": "tool versions",
+      "class": "string",
+      "optional": true,
+      "default": "original",
+      "choices": [
+        "original",
+        "reanalysis"
+      ],
+      "help": "original: PrepareAA (Apr 2020, 8284de8), AmpliconArchitect 1.2, AmpliconClassifier 1.1.2, CNVkit 0.9.6. reanalysis: AmpliconSuite-pipeline 1.3.3, AmpliconArchitect 1.4.r2, AmpliconClassifier 1.2.0, CNVkit 0.9.6."
+    }
+  ],
+  "outputSpec": [
+    {
+      "name": "results",
+      "label": "AmpliconSuite results",
+      "class": "file",
+      "patterns": [
+        "*.tar.gz"
+      ],
+      "help": "CNVkit, PrepareAA/AA and AC outputs for the sample."
+    },
+    {
+      "name": "tool_versions",
+      "label": "tool versions",
+      "class": "file",
+      "patterns": [
+        "*.txt"
+      ],
+      "help": "Tool versions, image and run parameters used for this run."
     }
   ],
   "runSpec": {
@@ -71,18 +123,7 @@
     "file": "src/AmpliconSuite-DNANexus-applet.sh",
     "distribution": "Ubuntu",
     "release": "20.04",
-    "version": "0",
-    "execDepends": [
-      {
-        "name": "python"
-      },
-      {
-        "name": "AmpliconSuite-pipeline",
-        "package_manager": "git",
-        "url": "https://github.com/AmpliconSuite/AmpliconSuite-pipeline",
-        "destdir": "resources"
-      }
-    ]
+    "version": "0"
   },
   "access": {
     "network": [

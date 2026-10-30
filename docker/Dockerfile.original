@@ -1,0 +1,68 @@
+# aa_version=original: the configuration used in the manuscript.
+#   PrepareAA          AmpliconSuite-pipeline (formerly jluebeck/PrepareAA) @ 8284de8, 2020-04-23
+#   AmpliconArchitect  1.2 @ d9aac51 (no upstream tag; last commit with __version__ = "1.2"), Python 2.7, Mosek 8.0.0.60
+#   AmpliconClassifier v1.1.2, Python 3 (separate conda env)
+#   CNVkit             0.9.6, Python 3.7 (separate conda env)
+# Build from the docker/ directory: see build_images.sh.
+FROM mambaorg/micromamba:1.5.8@sha256:475730daef12ff9c0733e70092aeeefdf4c373a584c952dac3f7bdb739601990 AS micromamba
+
+FROM ubuntu:20.04@sha256:8feb4d8ca5354def3d8fce243717141ce31e2c428701f6682bd2fafe15388214
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG PAA_COMMIT=8284de83e794b159094bfebcad7fc7e1a311f508
+ARG AA_COMMIT=d9aac5117f39dda621d16cf268417c5723426376
+ARG AC_TAG=v1.1.2
+ARG MOSEK_VERSION=8.0.0.60
+
+# AA 1.2 runtime: Python 2.7 is the default "python" (PrepareAA calls `python amplified_intervals.py`).
+RUN echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections \
+ && apt-get update && apt-get install -y --no-install-recommends \
+    build-essential bzip2 ca-certificates curl fontconfig gfortran git libbz2-dev libcurl4-openssl-dev \
+    liblzma-dev libssl-dev python-is-python2 python2 python2-dev samtools ttf-mscorefonts-installer zlib1g-dev \
+ && fc-cache -f && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://bootstrap.pypa.io/pip/2.7/get-pip.py -o /tmp/get-pip.py \
+ && python2 /tmp/get-pip.py pip==20.3.4 && rm /tmp/get-pip.py \
+ && python2 -m pip install --no-cache-dir Cython==0.29.24 numpy==1.16.6 \
+ && python2 -m pip install --no-cache-dir scipy==1.2.3 matplotlib==2.2.5 pysam==0.16.0.1 Flask==1.1.4
+
+ENV MOSEKPLATFORM=linux64x86
+ENV PATH=/opt/mosek/8/tools/platform/linux64x86/bin:$PATH \
+    LD_LIBRARY_PATH=/opt/mosek/8/tools/platform/linux64x86/bin
+RUN curl -fsSL https://download.mosek.com/stable/${MOSEK_VERSION}/mosektoolslinux64x86.tar.bz2 | tar -xj -C /opt \
+ && cd /opt/mosek/8/tools/platform/linux64x86/python/2 && python2 setup.py install
+
+RUN git clone https://github.com/AmpliconSuite/AmpliconArchitect.git /opt/AmpliconArchitect \
+ && git -C /opt/AmpliconArchitect checkout --detach ${AA_COMMIT} \
+ && git clone https://github.com/AmpliconSuite/AmpliconSuite-pipeline.git /opt/PrepareAA \
+ && git -C /opt/PrepareAA checkout --detach ${PAA_COMMIT} \
+ && git clone --depth 1 --branch ${AC_TAG} https://github.com/AmpliconSuite/AmpliconClassifier.git /opt/AmpliconClassifier \
+ && grep -qx '__version__ = "1.2"' /opt/AmpliconArchitect/src/AmpliconArchitect.py \
+ && grep -qx '__version__ = "1.1.2"' /opt/AmpliconClassifier/amplicon_classifier.py
+
+COPY --from=micromamba /bin/micromamba /usr/local/bin/micromamba
+COPY envs/cnvkit-0.9.6.yml envs/ac-1.1.2.yml /tmp/envs/
+ENV MAMBA_ROOT_PREFIX=/opt/conda
+RUN mkdir -p /opt/applet \
+ && micromamba create -y -n cnvkit -f /tmp/envs/cnvkit-0.9.6.yml \
+ && micromamba create -y -n ac -f /tmp/envs/ac-1.1.2.yml \
+ && micromamba env export -n cnvkit --explicit > /opt/applet/cnvkit.lock \
+ && micromamba env export -n ac --explicit > /opt/applet/ac.lock \
+ && micromamba clean -a -y && rm -rf /tmp/envs \
+ && /opt/conda/envs/cnvkit/bin/cnvkit.py version | grep -qx '0.9.6'
+
+ENV AA_SRC=/opt/AmpliconArchitect/src \
+    AC_SRC=/opt/AmpliconClassifier \
+    PAA_SRC=/opt/PrepareAA \
+    PAA_REFS=/opt/PrepareAA \
+    CNVKIT_BIN=/opt/conda/envs/cnvkit/bin \
+    AA_PYTHON=python2 \
+    AC_PYTHON=/opt/conda/envs/ac/bin/python
+
+COPY tool_versions.sh /opt/applet/tool_versions.sh
+RUN { echo "configuration: original"; \
+      echo "PrepareAA commit: $(git -C $PAA_SRC rev-parse HEAD) ($(git -C $PAA_SRC log -1 --format=%cs))"; \
+      echo "AmpliconArchitect commit: $(git -C /opt/AmpliconArchitect rev-parse HEAD)"; \
+      echo "AmpliconClassifier commit: $(git -C $AC_SRC rev-parse HEAD) (${AC_TAG})"; \
+      echo "PrepareAA reference files: ${PAA_REFS}/<ref> @ $(git -C $PAA_REFS rev-parse --short HEAD)"; \
+    } > /opt/applet/BUILD_INFO
